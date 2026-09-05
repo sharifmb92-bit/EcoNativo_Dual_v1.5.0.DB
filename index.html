@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Eco Nativo Dual_v 1.5.0</title>
+    
+    <meta property="og:title" content="Eco Nativo Dual_v 1.5.0">
+    <meta property="og:description" content="Traductor Universal y Asistente Local con IA Generativa.">
+    <meta property="og:image" content="icon-512.png">
+    <meta property="og:type" content="website">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        :root {
+            --bg-me: #1e1e1e;
+            --bg-client: #ffffff;
+            --c-idle: #ea4335;
+            --c-me: #ff7a00; 
+            --c-client: #34a853;
+            --c-info: #007aff;
+            --txt-me: #ffffff;
+            --txt-client: #333333;
+        }
+
+        body.high-contrast {
+            --bg-me: #000000;
+            --bg-client: #111111;
+            --txt-me: #ffff00;
+            --txt-client: #00ffff;
+        }
+
+        body.mode-driver #part-client {
+            height: 35dvh;
+            transform: none;
+            border-bottom: 2px solid var(--c-me);
+        }
+        body.mode-driver #part-me {
+            height: 65dvh;
+        }
+        body.mode-driver .client-text {
+            font-size: 32px;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; padding: 0; 
+            font-family: -apple-system, system-ui, sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html { 
+            height: 100dvh; overflow: hidden; 
+            background-color: #000;
+            display: flex; flex-direction: column;
+            user-select: none;
+        }
+
+        #splash {
+            position: fixed; inset: 0; background: #1e1e1e; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 3000; transition: opacity 0.5s ease;
+        }
+        #splash.hidden { opacity: 0; pointer-events: none; }
+
+        .perm-btn {
+            margin-top: 20px; padding: 14px 28px; background: var(--c-me);
+            color: white; border: none; border-radius: 25px; font-weight: bold;
+            font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 122, 0, 0.4);
+        }
+
+        #part-client {
+            height: 50dvh; background-color: var(--bg-client);
+            transform: rotate(180deg); display: flex; flex-direction: column;
+            padding: 20px 30px; justify-content: center; align-items: center;
+            position: relative; border-bottom: 1px solid #ddd;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+
+        #part-me {
+            height: 50dvh; background-color: var(--bg-me); color: var(--txt-me);
+            display: flex; flex-direction: column; padding: 30px;
+            justify-content: center; align-items: center; position: relative;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+
+        .lang-label {
+            font-size: 16px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--c-me); margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .text-display {
+            font-size: 28px; font-weight: 700; text-align: center;
+            width: 100%; line-height: 1.3; min-height: 1.3em;
+            max-height: 60%; overflow-y: auto; padding: 0 10px;
+        }
+        .client-text { color: var(--txt-client); }
+        .me-text { color: var(--txt-me); }
+        .interim { opacity: 0.5; font-weight: 400; font-style: italic; }
+
+        .controls {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 500; 
+            pointer-events: none; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .mic-wrapper {
+            position: absolute; pointer-events: auto;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mic-btn {
+            width: 90px; height: 90px; border-radius: 50%;
+            border: 6px solid #000; background: var(--c-idle); 
+            color: white; font-size: 38px; cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        .controls.pos-me .mic-wrapper { transform: translateY(80px); }
+        .controls.pos-client .mic-wrapper { transform: translateY(-130px); } 
+
+        .mode-me .mic-btn { background: var(--c-me); box-shadow: 0 0 30px var(--c-me); }
+        
+        .mode-client .mic-btn { 
+            background: var(--c-client); 
+            transform: scale(1.1);
+            animation: pulse-green-glow 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+
+        @keyframes pulse-green-glow {
+            0%, 100% { box-shadow: 0 0 25px rgba(52, 168, 83, 0.6); }
+            50% { box-shadow: 0 0 45px rgba(52, 168, 83, 0.9), 0 0 0 15px rgba(52, 168, 83, 0%); }
+        }
+
+        .flags {
+            position: absolute; 
+            top: calc(15px + env(safe-area-inset-top)); 
+            display: flex; gap: 15px; z-index: 600;
+        }
+        .flag-btn {
+            font-size: 26px; background: rgba(0,0,0,0.05); 
+            border: 2px solid transparent; border-radius: 50%; 
+            width: 55px; height: 55px; display: flex; 
+            align-items: center; justify-content: center; 
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .flag-btn.active { border-color: var(--c-me); background: rgba(0,0,0,0.1); transform: scale(1.1); }
+
+        /* Barra de Acceso Directo Superior */
+        .direct-tools {
+            position: absolute; top: 15px; left: 15px;
+            display: flex; gap: 10px; z-index: 700;
+        }
+        .direct-btn {
+            background: rgba(0,0,0,0.6); border: 2px solid var(--c-me);
+            color: white; padding: 8px 14px; border-radius: 20px;
+            font-size: 15px; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .top-tools {
+            position: absolute; bottom: 20px; right: 20px;
+            display: flex; gap: 10px; z-index: 700;
+        }
+        .tool-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer;
+        }
+
+        /* Modal de Notas con Tipografía 18px y Borrado */
+        #notes-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            z-index: 4000; display: flex; flex-direction: column; padding: 25px 20px;
+            color: white; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #notes-modal.active { opacity: 1; pointer-events: auto; }
+        .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .notes-list { flex: 1; overflow-y: auto; margin-bottom: 15px; }
+        .note-item { 
+            background: #222; padding: 16px; border-radius: 10px; margin-bottom: 12px; 
+            font-size: 18px; line-height: 1.4; border-left: 5px solid var(--c-me);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .note-content { flex: 1; padding-right: 12px; }
+        .note-date { font-size: 12px; color: #aaa; margin-top: 6px; }
+        .delete-btn {
+            background: #e74c3c; border: none; color: white;
+            padding: 8px 12px; border-radius: 8px; font-size: 16px; cursor: pointer;
+        }
+        .clear-all-btn {
+            background: #444; color: #ff5555; border: 1px solid #ff5555;
+            padding: 10px; border-radius: 10px; font-weight: bold; font-size: 14px;
+            cursor: pointer; margin-bottom: 10px; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash">
+        <div style="font-size: 60px; margin-bottom: 20px;">🗣️</div>
+        <h2 style="letter-spacing: 4px; font-weight: 300;">ECO NATIVO DUAL 1.5.0</h2>
+        <p style="font-size: 10px; margin-top: 10px; opacity: 0.5; letter-spacing: 2px;">UNIVERSAL TRANSLATOR &amp; AI ASSISTANT</p>
+        <button class="perm-btn" onclick="startAppDirectly()">INICIAR APLICACIÓN</button>
+    </div>
+
+    <div id="part-client" onclick="startTurnFromArea('client')">
+        <div class="flags" id="flags-container"></div>
+        <div class="text-display client-text" id="text-client">...</div>
+    </div>
+
+    <div class="controls" id="control-zone">
+        <div class="mic-wrapper">
+            <button class="mic-btn" id="main-mic" onclick="handleCentralButton(event)">🎙️</button>
+        </div>
+    </div>
+
+    <div id="part-me" onclick="startTurnFromArea('me')">
+        <!-- Accesos Directos por Botón -->
+        <div class="direct-tools">
+            <button class="direct-btn" onclick="startDirectNote(event)">📝 Nota</button>
+            <button class="direct-btn" style="border-color: var(--c-info);" onclick="startDirectQuery(event)">🤖 Consultorio IA</button>
+        </div>
+
+        <div class="lang-label" id="label-client">...</div>
+        <div class="text-display me-text" id="text-me">...</div>
+        
+        <div class="top-tools">
+            <button class="tool-btn" id="mode-btn" title="Cambiar Vista Conductor/Mostrador" onclick="toggleDisplayMode(event)">🚌</button>
+            <button class="tool-btn" title="Modo Sol" onclick="toggleContrast(event)">☀️</button>
+            <button class="tool-btn" title="Notas del Usuario" onclick="openNotesModal(event)">📝</button>
+        </div>
+    </div>
+
+    <!-- Modal de Notas Rediseñado -->
+    <div id="notes-modal">
+        <div class="notes-header">
+            <h3>📝 Bloc de Notas de Voz</h3>
+            <button class="delete-btn" style="background:#555;" onclick="closeNotesModal()">✕</button>
+        </div>
+        <div class="notes-list" id="notes-container"></div>
+        <button class="clear-all-btn" onclick="clearAllNotes()">🗑️ Vaciar Todas las Notas</button>
+        <button class="perm-btn" style="margin-top:0; width:100%;" onclick="closeNotesModal()">Cerrar</button>
+    </div>
+
+    <script>
+        // medbasha - adaptive local acoustic unifier, ai query engine & indexeddb persistence
+        if ('serviceWorker' in navigator) { 
+            navigator.serviceWorker.register('./sw.js'); 
+        }
+
+        // Configuración de la API Key de Gemini (puedes introducir la tuya)
+        const GEMINI_API_KEY = ""; 
+
+        let db;
+        let userLang = 'es'; 
+        let targetLang = 'en';
+        let isRunning = false;
+        let isSpeakingNow = false; 
+        let currentTurn = 'idle'; 
+        let currentMode = 'translate'; // 'translate', 'note', 'query'
+        let recognition = null;
+        let hardwareWatchdogTimer;
+
+        const langCodes = { 'es': 'es-ES', 'en': 'en-US', 'fr': 'fr-FR', 'de': 'de-DE', 'it': 'it-IT' };
+        const langNames = {
+            'es': { 'es': 'Español', 'en': 'Spanish', 'fr': 'Espagnol', 'de': 'Spanisch', 'it': 'Spagnolo' },
+            'en': { 'es': 'Inglés', 'en': 'English', 'fr': 'Anglais', 'de': 'Englisch', 'it': 'Inglese' },
+            'fr': { 'es': 'Francés', 'en': 'French', 'fr': 'Français', 'de': 'Französisch', 'it': 'Francese' },
+            'de': { 'es': 'Alemán', 'en': 'German', 'fr': 'Allemand', 'de': 'Deutsch', 'it': 'Tedesco' },
+            'it': { 'es': 'Italiano', 'en': 'Italian', 'fr': 'Italien', 'de': 'Italienisch', 'it': 'Italiano' }
+        };
+
+        const actionMsgs = {
+            'es': 'Toca tu zona o el botón para hablar',
+            'en': 'Tap your zone or button to speak',
+            'fr': 'Touchez votre zone pour parler',
+            'de': 'Tippen Sie zum Sprechen',
+            'it': 'Tocca la tua zona per parlare'
+        };
+
+        const fallbackMsgs = {
+            'es': 'Lo siento, no he entendido. Vuelve a pulsar.',
+            'en': 'I am sorry, I did not understand. Tap again.',
+            'fr': 'Désolé, je n\'ai pas compris. Appuyez à nouveau.',
+            'de': 'Entschuldigung, das habe ich nicht verstanden.',
+            'it': 'Mi dispiace, non ho capito. Tocca di nuevo.'
+        };
+
+        // Diccionario Universal de Cortesía Directa
+        const courtesyDictionary = {
+            'buenos dias': { 'es': 'Buenos días', 'en': 'Good morning', 'fr': 'Bonjour', 'de': 'Guten Morgen', 'it': 'Buongiorno' },
+            'buenos días': { 'es': 'Buenos días', 'en': 'Good morning', 'fr': 'Bonjour', 'de': 'Guten Morgen', 'it': 'Buongiorno' },
+            'buenas tardes': { 'es': 'Buenas tardes', 'en': 'Good afternoon', 'fr': 'Bonsoir', 'de': 'Guten Tag', 'it': 'Buon pomeriggio' },
+            'buenas noches': { 'es': 'Buenas noches', 'en': 'Good evening', 'fr': 'Bonne nuit', 'de': 'Gute Nacht', 'it': 'Buona notte' },
+            'gracias': { 'es': 'Gracias', 'en': 'Thank you', 'fr': 'Merci', 'de': 'Danke', 'it': 'Grazie' },
+            'muchas gracias': { 'es': 'Muchas gracias', 'en': 'Thank you very much', 'fr': 'Merci beaucoup', 'de': 'Vielen Dank', 'it': 'Mille grazie' },
+            'por favor': { 'es': 'Por favor', 'en': 'Please', 'fr': "S'il vous plaît", 'de': 'Bitte', 'it': 'Per favore' },
+            'de nada': { 'es': 'De nada', 'en': "You're welcome", 'fr': 'De rien', 'de': 'Bitte sehr', 'it': 'Prego' },
+            'hola': { 'es': 'Hola', 'en': 'Hello', 'fr': 'Bonjour', 'de': 'Hallo', 'it': 'Ciao' },
+            'adios': { 'es': 'Adiós', 'en': 'Goodbye', 'fr': 'Au revoir', 'de': 'Auf Wiedersehen', 'it': 'Arrivederci' },
+            'adiós': { 'es': 'Adiós', 'en': 'Goodbye', 'fr': 'Au revoir', 'de': 'Auf Wiedersehen', 'it': 'Arrivederci' },
+            'hasta luego': { 'es': 'Hasta luego', 'en': 'See you later', 'fr': 'À plus tard', 'de': 'Bis später', 'it': 'A dopo' }
+        };
+
+        // Base de Datos de Respaldo Local (Corregida: L01, L14 Express, L10 Aeropuerto)
+        const localKnowledgeBase = [
+            {
+                keywords: ["bus", "autobus", "autobús", "mahón", "maó", "ciutadella", "horario", "l01", "l14", "express", "expres"],
+                answers: {
+                    'es': "Para ir de Ciutadella a Maó dispones de la línea regular L01 (con paradas en Alaior, Es Mercadal y Ferreries) y de la línea L14 Express (directa sin paradas).",
+                    'en': "To travel between Ciutadella and Maó you can use line L01 (stopping at Alaior, Es Mercadal, and Ferreries) or the L14 Express line (direct without stops).",
+                    'fr': "Pour aller de Ciutadella à Maó, vous avez la ligne L01 (avec arrêts) et la ligne L14 Express (directe sans arrêt).",
+                    'de': "Für die Fahrt zwischen Ciutadella und Maó gibt es die Linie L01 (mit Zwischenstopps) und die Linie L14 Express (direkt ohne Stopps).",
+                    'it': "Per andare da Ciutadella a Maó puoi usare la linea L01 (con fermate) o la linea L14 Express (diretta senza fermate)."
+                }
+            },
+            {
+                keywords: ["aeropuerto", "aeroport", "l10", "volar", "vuelo"],
+                answers: {
+                    'es': "No hay bus directo de Ciutadella al Aeropuerto. Hay que ir primero a la Estación de Maó (L01 o L14) y allí hacer trasbordo con la línea L10 hacia el Aeropuerto.",
+                    'en': "There is no direct bus from Ciutadella to the Airport. Take line L01 or L14 to Maó Bus Station and transfer to line L10 to the Airport.",
+                    'fr': "Il n'y a pas de bus direct de Ciutadella à l'aéroport. Il faut aller à la gare de Maó (L01/L14) et prendre la ligne L10 vers l'aéroport.",
+                    'de': "Es gibt keinen direkten Bus von Ciutadella zum Flughafen. Fahren Sie nach Maó (L01/L14) und steigen Sie dort in die Linie L10 um.",
+                    'it': "Non c'è un autobus diretto da Ciutadella all'aeroporto. Occorre andare alla stazione di Maó (L01/L14) e fare il cambio con la linea L10."
+                }
+            },
+            {
+                keywords: ["taxi", "radiotaxi", "número de taxi", "numero de taxi", "telefono", "teléfono"],
+                answers: {
+                    'es': "El teléfono central de Radio Taxi en Menorca es el 971 36 71 11. En Ciutadella también dispones del 971 38 11 97.",
+                    'en': "The main Radio Taxi number in Menorca is +34 971 36 71 11. In Ciutadella you can also call +34 971 38 11 97.",
+                    'fr': "Le numéro principal de Radio Taxi à Menorca est le +34 971 36 71 11. À Ciutadella: +34 971 38 11 97.",
+                    'de': "Die Hauptnummer von Radio Taxi auf Menorca lautet +34 971 36 71 11. In Ciutadella: +34 971 38 11 97.",
+                    'it': "Il numero principale di Radio Taxi a Minorca è +34 971 36 71 11. A Ciutadella: +34 971 38 11 97."
+                }
+            },
+            {
+                keywords: ["urgencia", "urgencias", "hospital", "farmacia", "policia", "policía", "emergencia", "112"],
+                answers: {
+                    'es': "Para emergencias llama al 112. El hospital principal es el Mateu Orfila en Maó. Hay centros de salud (PAC) y farmacias de guardia en todos los municipios.",
+                    'en': "For emergencies dial 112. The main hospital is Mateu Orfila in Maó. Health centers (PAC) and on-duty pharmacies are available in every town.",
+                    'fr': "En cas d'urgence, composez le 112. L'hôpital principal est le Mateu Orfila à Maó. Il y a des centres de santé dans chaque commune.",
+                    'de': "Bei Notfällen wählen Sie 112. Das Hauptkrankenhaus ist Mateu Orfila in Maó. Gesundheitszentren gibt es in allen Gemeinden.",
+                    'it': "Per emergenze chiama il 112. L'ospedale principale è il Mateu Orfila a Maó. Ci sono centri di salute in tutti i comuni."
+                }
+            }
+        ];
+
+        window.onload = () => {
+            initIndexedDB();
+            detectDeviceLanguage();
+            setupFlagsStructure();
+            resetToIdleMessage();
+        };
+
+        function requestStoragePersistence() {
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist();
+            }
+        }
+
+        function initIndexedDB() {
+            requestStoragePersistence();
+            const request = indexedDB.open("EcoNativoDualDB", 2);
+            request.onupgradeneeded = (e) => {
+                db = e.target.result;
+                if (!db.objectStoreNames.contains("appState")) {
+                    db.createObjectStore("appState", { keyPath: "id" });
+                }
+                if (!db.objectStoreNames.contains("incidencias")) {
+                    db.createObjectStore("incidencias", { keyPath: "id", autoIncrement: true });
+                }
+            };
+            request.onsuccess = (e) => { db = e.target.result; };
+            request.onerror = (e) => { console.error("IndexedDB error", e); };
+        }
+
+        function startAppDirectly() {
+            document.getElementById('splash').classList.add('hidden');
+        }
+
+        function toggleDisplayMode(e) {
+            e.stopPropagation();
+            document.body.classList.toggle('mode-driver');
+            const btn = document.getElementById('mode-btn');
+            btn.innerText = document.body.classList.contains('mode-driver') ? '🏢' : '🚌';
+        }
+
+        function toggleContrast(e) {
+            e.stopPropagation();
+            document.body.classList.toggle('high-contrast');
+        }
+
+        function saveNote(text) {
+            if (!db || !text || text.length < 2) return;
+            const tx = db.transaction("incidencias", "readwrite");
+            const store = tx.objectStore("incidencias");
+            store.add({ text: text, date: new Date().toLocaleString() });
+        }
+
+        function deleteNote(id) {
+            if (!db) return;
+            const tx = db.transaction("incidencias", "readwrite");
+            const store = tx.objectStore("incidencias");
+            store.delete(id);
+            tx.oncomplete = () => { openNotesModal(new Event('dummy')); };
+        }
+
+        function clearAllNotes() {
+            if (!db) return;
+            if (confirm("¿Estás seguro de que quieres borrar todas las notas guardadas?")) {
+                const tx = db.transaction("incidencias", "readwrite");
+                const store = tx.objectStore("incidencias");
+                store.clear();
+                tx.oncomplete = () => { openNotesModal(new Event('dummy')); };
+            }
+        }
+
+        function openNotesModal(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+            if (!db) return;
+            const container = document.getElementById('notes-container');
+            container.innerHTML = 'Cargando...';
+            
+            const tx = db.transaction("incidencias", "readonly");
+            const store = tx.objectStore("incidencias");
+            const req = store.getAll();
+
+            req.onsuccess = () => {
+                const items = req.result;
+                if (items.length === 0) {
+                    container.innerHTML = '<p style="color:#aaa; text-align:center; padding:20px;">No hay notas guardadas.</p>';
+                } else {
+                    container.innerHTML = items.reverse().map(item => `
+                        <div class="note-item">
+                            <div class="note-content">
+                                <div>${item.text}</div>
+                                <div class="note-date">${item.date}</div>
+                            </div>
+                            <button class="delete-btn" onclick="deleteNote(${item.id})">🗑️</button>
+                        </div>
+                    `).join('');
+                }
+                document.getElementById('notes-modal').classList.add('active');
+            };
+        }
+
+        function closeNotesModal() {
+            document.getElementById('notes-modal').classList.remove('active');
+        }
+
+        function detectDeviceLanguage() {
+            const sysLang = navigator.language || navigator.userLanguage;
+            const shortLang = sysLang.substring(0, 2).toLowerCase();
+            if (['en', 'fr', 'de', 'it'].includes(shortLang)) {
+                userLang = shortLang;
+                targetLang = 'es';
+            } else {
+                userLang = 'es';
+                targetLang = 'en';
+            }
+        }
+
+        function setupFlagsStructure() {
+            const container = document.getElementById('flags-container');
+            container.innerHTML = '';
+            const allOptions = ['en', 'fr', 'de', 'it', 'es'];
+            const flagIcons = { 'en': '🇬🇧', 'fr': '🇫🇷', 'de': '🇩🇪', 'it': '🇮🇹', 'es': '🇪🇸' };
+            const availableTargets = allOptions.filter(l => l !== userLang);
+
+            availableTargets.forEach(lang => {
+                const btn = document.createElement('button');
+                btn.className = `flag-btn ${lang === targetLang ? 'active' : ''}`;
+                btn.innerText = flagIcons[lang];
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    setLang(lang, langNames[lang][userLang]);
+                };
+                container.appendChild(btn);
+            });
+            document.getElementById('label-client').innerText = langNames[targetLang][userLang].toUpperCase();
+        }
+
+        function resetToIdleMessage() {
+            document.getElementById('text-me').innerText = actionMsgs[userLang];
+            document.getElementById('text-client').innerText = "...";
+            currentMode = 'translate';
+        }
+
+        function setLang(lang, name) {
+            targetLang = lang;
+            document.getElementById('label-client').innerText = name.toUpperCase();
+            document.querySelectorAll('.flag-btn').forEach(b => b.classList.remove('active'));
+            stopConversation();
+        }
+
+        function killSpeechEngine() {
+            clearTimeout(hardwareWatchdogTimer);
+            if (recognition) {
+                try {
+                    recognition.onstart = null;
+                    recognition.onresult = null;
+                    recognition.onerror = null;
+                    recognition.onend = null;
+                    recognition.abort();
+                } catch(e){}
+                recognition = null;
+            }
+        }
+
+        function createFreshRecognition() {
+            const SpeechEngine = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechEngine) return null;
+
+            killSpeechEngine();
+
+            const rec = new SpeechEngine();
+            rec.continuous = false;
+            rec.interimResults = true; 
+
+            rec.onstart = () => { 
+                clearTimeout(hardwareWatchdogTimer); 
+            };
+
+            rec.onresult = (event) => {
+                clearTimeout(hardwareWatchdogTimer);
+
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                const currentDisplay = currentTurn === 'me' ? document.getElementById('text-me') : document.getElementById('text-client');
+                
+                if (finalTranscript) {
+                    processFinalText(finalTranscript);
+                } else if (interimTranscript) {
+                    currentDisplay.innerHTML = `<span class="interim">${interimTranscript}</span>`;
+                    hardwareWatchdogTimer = setTimeout(() => { 
+                        try { rec.stop(); } catch(e){} 
+                    }, 3500);
+                }
+            };
+
+            rec.onerror = (e) => {
+                clearTimeout(hardwareWatchdogTimer);
+                if (!isRunning || isSpeakingNow) return;
+                handleErrorAndReset();
+            };
+
+            rec.onend = () => { 
+                clearTimeout(hardwareWatchdogTimer); 
+            };
+
+            return rec;
+        }
+
+        function handleCentralButton(event) {
+            event.stopPropagation();
+            if (isRunning) {
+                stopConversation();
+            } else {
+                currentMode = 'translate';
+                startTurn('me');
+            }
+        }
+
+        function startDirectNote(e) {
+            e.stopPropagation();
+            currentMode = 'note';
+            startTurn('me');
+        }
+
+        function startDirectQuery(e) {
+            e.stopPropagation();
+            currentMode = 'query';
+            startTurn('me');
+        }
+
+        function startTurnFromArea(turn) {
+            if (isSpeakingNow) return;
+            currentMode = 'translate';
+            startTurn(turn);
+        }
+
+        function startTurn(turn) {
+            if (isSpeakingNow) return;
+            
+            killSpeechEngine();
+            isRunning = true;
+            currentTurn = turn;
+            updateUI();
+
+            const currentDisplay = currentTurn === 'me' ? document.getElementById('text-me') : document.getElementById('text-client');
+            
+            let labelPrompt = "🎤 ...";
+            if (currentMode === 'note') labelPrompt = "📝 Dicta tu nota...";
+            if (currentMode === 'query') labelPrompt = "🤖 Consultando IA...";
+
+            currentDisplay.innerHTML = `<span class="interim">${labelPrompt}</span>`;
+
+            recognition = createFreshRecognition();
+            if (!recognition) {
+                alert("El navegador no soporta reconocimiento de voz.");
+                returnToIdleState();
+                return;
+            }
+
+            recognition.lang = currentTurn === 'me' ? langCodes[userLang] : langCodes[targetLang];
+
+            try {
+                recognition.start();
+            } catch (e) {
+                setTimeout(() => { 
+                    try { if(recognition) recognition.start(); } catch(err) {}
+                }, 200);
+            }
+        }
+
+        function updateUI() {
+            const container = document.getElementById('control-zone');
+            if (!isRunning || currentTurn === 'idle' || isSpeakingNow) { 
+                container.className = 'controls'; 
+                return; 
+            }
+            container.className = currentTurn === 'me' ? 'controls pos-me mode-me' : 'controls pos-client mode-client';
+        }
+
+        function protectProperNouns(text) {
+            const localTerms = ["Mahón", "Menorca", "Ciutadella", "Alaior", "Fornells", "Sánchez", "Dr."];
+            let words = text.split(' ');
+            return words.map(word => {
+                if (localTerms.some(t => t.toLowerCase() === word.toLowerCase())) return word; 
+                return word;
+            }).join(' ');
+        }
+
+        function internalEngineFilter(text) {
+            let processed = text.trim();
+            if (processed.length < 2) return "";
+
+            if (/^(si|sí|ok|vale|yes|oui|ja)$/i.test(processed)) processed = "Sí, de acuerdo.";
+            if (/^(no|non|nein)$/i.test(processed)) processed = "No, lo siento.";
+
+            return processed.charAt(0).toUpperCase() + processed.slice(1);
+        }
+
+        // Conexión a la API de IA Generativa de Gemini con Respaldo Offline
+        async function fetchAIAnswer(prompt, lang) {
+            if (!navigator.onLine || !GEMINI_API_KEY) {
+                return getOfflineKnowledge(prompt, lang);
+            }
+
+            try {
+                const systemPrompt = `Eres un asistente local inteligente y amable para visitantes y trabajadores en Menorca. Responde en el idioma '${lang}' de forma concisa, clara y directa (máximo 2-3 frases breves). Pregunta: ${prompt}`;
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: systemPrompt }] }]
+                    })
+                });
+
+                const data = await res.json();
+                if (data && data.candidates && data.candidates[0].content.parts[0].text) {
+                    return data.candidates[0].content.parts[0].text.trim();
+                } else {
+                    return getOfflineKnowledge(prompt, lang);
+                }
+            } catch (e) {
+                return getOfflineKnowledge(prompt, lang);
+            }
+        }
+
+        function getOfflineKnowledge(prompt, lang) {
+            const lowerQuery = prompt.toLowerCase();
+            for (let item of localKnowledgeBase) {
+                if (item.keywords.some(kw => lowerQuery.includes(kw))) {
+                    return item.answers[lang] || item.answers['es'];
+                }
+            }
+            return fallbackMsgs[lang];
+        }
+
+        async function processFinalText(text) {
+            if (!text) return;
+            clearTimeout(hardwareWatchdogTimer);
+            killSpeechEngine();
+            
+            let cleanText = protectProperNouns(text);
+            cleanText = internalEngineFilter(cleanText);
+            
+            if (!cleanText) { handleErrorAndReset(); return; }
+
+            const el = currentTurn === 'me' ? document.getElementById('text-me') : document.getElementById('text-client');
+            el.innerText = cleanText;
+
+            // Modo 1: Guardar Nota Directa
+            if (currentMode === 'note' || cleanText.toLowerCase().startsWith("nota")) {
+                const noteContent = cleanText.toLowerCase().startsWith("nota") ? cleanText.substring(4).trim() : cleanText;
+                saveNote(noteContent);
+                document.getElementById('text-me').innerText = "📝 Nota guardada en el bloc.";
+                speak("Nota guardada correctamente", langCodes[userLang], () => { returnToIdleState(); });
+                return;
+            }
+
+            // Modo 2: Consultorio Inteligente (IA Generativa con Respaldo Offline)
+            if (currentMode === 'query') {
+                document.getElementById('text-me').innerHTML = `<span class="interim">🤖 Procesando IA...</span>`;
+                const aiResponse = await fetchAIAnswer(cleanText, userLang);
+                
+                document.getElementById('text-me').innerText = aiResponse;
+                speak(aiResponse, langCodes[userLang], () => { returnToIdleState(); });
+                return;
+            }
+
+            // Modo 3: Traducción Normal
+            try {
+                const from = currentTurn === 'me' ? userLang : targetLang; 
+                const to = currentTurn === 'me' ? targetLang : userLang;
+                
+                const lowerText = cleanText.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+                if (courtesyDictionary[lowerText] && courtesyDictionary[lowerText][to]) {
+                    const localTranslated = courtesyDictionary[lowerText][to];
+                    if (currentTurn === 'me') {
+                        document.getElementById('text-client').innerText = localTranslated;
+                        speak(localTranslated, langCodes[targetLang], () => { returnToIdleState(); });
+                    } else {
+                        document.getElementById('text-me').innerText = localTranslated;
+                        speak(localTranslated, langCodes[userLang], () => { returnToIdleState(); });
+                    }
+                    return;
+                }
+
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanText)}&langpair=${from}|${to}`);
+                const data = await res.json();
+                let translated = data.responseData.translatedText;
+
+                translated = protectProperNouns(translated);
+                translated = internalEngineFilter(translated);
+
+                if (currentTurn === 'me') {
+                    document.getElementById('text-client').innerText = translated;
+                    speak(translated, langCodes[targetLang], () => { returnToIdleState(); });
+                } else {
+                    document.getElementById('text-me').innerText = translated;
+                    speak(translated, langCodes[userLang], () => { returnToIdleState(); });
+                }
+            } catch (e) { handleErrorAndReset(); }
+        }
+
+        function speak(text, lang, callback) {
+            isSpeakingNow = true;
+            clearTimeout(hardwareWatchdogTimer);
+            killSpeechEngine();
+            updateUI(); 
+
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = lang; 
+            u.rate = 0.90; 
+            u.pitch = 1.0;
+            
+            u.onend = () => { isSpeakingNow = false; callback(); };
+            u.onerror = () => { isSpeakingNow = false; callback(); };
+            
+            window.speechSynthesis.speak(u);
+        }
+
+        function handleErrorAndReset() {
+            killSpeechEngine();
+            const lang = currentTurn === 'me' ? userLang : targetLang;
+            const el = currentTurn === 'me' ? document.getElementById('text-me') : document.getElementById('text-client');
+            el.innerText = fallbackMsgs[lang];
+            returnToIdleState();
+        }
+
+        function returnToIdleState() {
+            isRunning = false;
+            isSpeakingNow = false;
+            currentTurn = 'idle';
+            currentMode = 'translate';
+            killSpeechEngine();
+            updateUI();
+        }
+
+        function stopConversation() {
+            returnToIdleState();
+            window.speechSynthesis.cancel();
+            resetToIdleMessage();
+        }
+
+        document.addEventListener("visibilitychange", () => { if (document.hidden) stopConversation(); });
+    </script>
+</body>
+</html>
